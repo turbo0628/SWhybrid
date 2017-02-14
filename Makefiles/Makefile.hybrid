@@ -1,0 +1,72 @@
+CXX=icpc
+NVCC=nvcc
+CUDA_HOME?=$(shell dirname -- $(shell which nvcc))
+$(warning using CUDA path $(CUDA_HOME))
+
+CPU_ARCH=sse
+CUDA_ARCH_GENCODE?=-gencode arch=compute_35,code=sm_35
+CUDA_ARCH_GENCODE+=-gencode arch=compute_52,code=sm_52
+#CUDA_ARCH_GENCODE+=-gencode arch=compute_61,code=sm_61
+DEFS+=-DHAVE_SSSE3
+
+INCLUDES=-I$(CUDA_HOME)/include
+
+#basic
+CXX_SRC=WorkerPool.cpp DataPool.cpp  main.cpp RecalcWorker.cpp Worker.cpp Param.cpp Bucket.cpp FastaFile.cpp
+
+#cpu kernel
+ifeq ($(CPU_ARCH),avx2)
+CXX_SRC+=AVXKernel.cpp AVXWorker.cpp
+CXXFLAGS+=-mavx2
+DEFS+=-DWITH_AVX2
+else
+CXX_SRC+=SSEKernel.cpp SSEWorker.cpp
+CXXFLAGS+=-msse2 -mssse3
+endif
+
+ifeq ($(CXX), g++)
+LIBS=-lgomp
+endif
+
+#knc kernel
+DEFS+=-DWITH_KNC
+CXX_SRC+=KNCWorker.cpp KNCKernel.cpp
+
+#cuda kernel
+DEFS+=-DWITH_CUDA
+NVCC_SRC=CUDAWorker.cu CUDAKernel.cu CUDAWorkerVideoSIMD.cu CUDAKernelVideoSIMD.cu
+LIBS+=-L$(CUDA_HOME)/lib64/ -lcudart
+
+$(warning Using $(CPU_ARCH) for CPU kernel)
+$(warning NVCC gencode option $(CUDA_ARCH_GENCODE))
+
+CXXFLAGS+=-O3 -fopenmp -pthread $(DEFS) $(INCLUDES) 
+NVCCFLAGS=-O3 -Xptxas -v $(CUDA_ARCH_GENCODE)
+
+src_dir=./src
+obj_dir=./obj
+
+obj=$(patsubst %.cpp, $(obj_dir)/%.cpp.o, $(CXX_SRC))
+obj+=$(patsubst %.cu, $(obj_dir)/%.cu.o, $(NVCC_SRC))
+
+
+
+EXEC=swhybrid
+.PHONY:all
+all: dbmaker swhybrid
+dbmaker: dir $(obj)
+	$(CXX) -O2 obj/FastaFile.cpp.o obj/Bucket.cpp.o src/DBmaker.cpp -o DBmaker 
+swhybrid: dir $(obj)
+	$(CXX) -fopenmp -pthread $(obj) -o $(EXEC) $(LIBS)
+	strip $(EXEC)
+dir:
+	mkdir -p $(obj_dir)
+
+$(obj_dir)/%.cpp.o:$(src_dir)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(obj_dir)/%.cu.o:$(src_dir)/%.cu
+	$(NVCC)  $(NVCCFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(EXEC) $(obj_dir)

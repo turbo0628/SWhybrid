@@ -1,0 +1,55 @@
+CXX=icpc
+
+CPU_ARCH=sse
+DEFS+=-DHAVE_SSSE3
+
+#basic
+CXX_SRC=WorkerPool.cpp DataPool.cpp  main.cpp RecalcWorker.cpp Worker.cpp Param.cpp Bucket.cpp FastaFile.cpp 
+
+#cpu kernel
+ifeq ($(CPU_ARCH),avx2)
+CXX_SRC+=AVXKernel.cpp AVXWorker.cpp
+CXXFLAGS+=-mavx2
+DEFS+=-DUSE_AVX2
+else
+CXX_SRC+=SSEKernel.cpp SSEWorker.cpp
+CXXFLAGS+=-msse2 -mssse3
+endif
+
+ifeq ($(CXX), g++)
+LIBS=-lgomp
+endif
+
+#for KNC kernel
+DEFS+=-DWITH_KNC
+CXXFLAGS+=-offload
+CXX_SRC+=KNCWorker.cpp KNCKernel.cpp
+
+$(warning Using $(CPU_ARCH) for CPU kernel)
+
+CXXFLAGS+=-O3 -openmp -pthread $(DEFS) $(INCLUDES) 
+
+src_dir=./src
+obj_dir=./obj
+
+obj=$(patsubst %.cpp, $(obj_dir)/%.cpp.o, $(CXX_SRC))
+obj+=$(patsubst %.cu, $(obj_dir)/%.cu.o, $(NVCC_SRC))
+
+EXEC=swhybrid
+.PHONY:all
+
+all: dbmaker swhybrid
+dbmaker: dir $(obj)
+	$(CXX) -O2 obj/FastaFile.cpp.o obj/Bucket.cpp.o src/DBmaker.cpp -o DBmaker 
+swhybrid: dir $(obj)
+	$(CXX) -openmp -pthread $(obj) -o $(EXEC) $(LIBS)
+	strip $(EXEC)
+dir:
+	mkdir -p $(obj_dir)
+
+$(obj_dir)/%.cpp.o:$(src_dir)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+
+clean:
+	rm -rf $(EXEC) $(obj_dir)
