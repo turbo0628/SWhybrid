@@ -2,7 +2,10 @@
 
 The SWhybrid is a heterogeneous framework to use CPU, CUDA-enabled GPUs and Xeon Phi (KNC and KNL both supported) to perform Smith-Waterman database search. We have designed a highly extensible framework to support different architectures flexibly. You can put any coprocessors in the workstations as you want,i.e. GTX1080 along with a Xeon Phi 7110p coprocessor, and they can still work properly at best efficiency. 
 
-##Build
+## Citation
+H. Lan, W. Liu, Y. Liu and B. Schmidt*: SWhybrid: A Hybrid-Parallel Framework for Large-Scale Protein Sequence Database Search, the 31st IEEE International Parallel \& Distributed Processing Symposium (IPDPS 2017), Orlando, USA, May, 2017 (To Appear).
+
+## Build
 
 SWhybrid features its extensibility by supporting different types of devices.   
 
@@ -100,21 +103,21 @@ strip swhybrid
 ~~~
 
 
-##Usage
+## Usage
 
 A successful build will generate a preprocessor DBmaker and the main binary SWhbyrid. Firstly you have to call the DBmaker to genrate an indexed database.
 Currently we only support FASTA format as input. And then, you can use SWhybrid to search. SWhybrid is designed for heterogeneous architectures and 
 tends to use every single devices available in the system.
 If you want to run benchmark only on a single platform, please use change the Makefile and rebuild SWhybrid.
 
-###Preprocess
+### Preprocess
 ~~~
 ./DBmaker [Input path (FASTA required)] [Output_path]
 ~~~
 Currently only FASTA format are accepted.
 The preprocessor will generate OUTPUT.seq, OUTPUT.map and OUTPUT.title, respectively. You can speicify any of them when running SWhybrid.
 
-###Run
+### Run
 Parameter list:
 
 ~~~
@@ -130,11 +133,13 @@ Scoring Scheme:
 -v       (verbose, show current search progress and system configuration)
 ~~~
 
-###Typical Search Example
+
+### Typical Search Example
 
 We use the env_nr database from NCBI as an example:
 
 Firstly download the latest version of the database
+
 ~~~
 $wget ftp://ftp.ncbi.nlm.nih.gov/blast/db/FASTA/env_nr.gz
 ~~~
@@ -246,6 +251,34 @@ score 1771 -- >gi|142623539|gb|ECZ40182.1| hypothetical protein GOS_2190190 [mar
 As each worker on KNL only uses a part of the cores, you will see multiple standalone GCUPS reported.
 The overall GCUPS performance including the recalculation time is reported in the last figure.
 
-##Known Issue
+
+## Performance Evaluation Results
+
+We have conducted performance evaluation on the following heterogeneous test platforms:
+
+|Server|Processor|Memory|Accelerator|
+|------|---------|------|-----------|
+|S1|dual E5-2620|16GB|1 Titan X (Maxwell) + 1 Phi-7110|
+|S2|dual E5-2620|16GB|2 Phi-7110|
+|S3|dual E5-2620|16GB|2 Tesla K40|
+|S4|dual E5-2620|16GB|1 Titan X (Maxwell) + 1 GTX1080|
+|S5| Xeon Phi 7210| 128GB|-|
+
+Performance on CPUs, including SSE, AVX2 on E5-2620 and E5-2683v4, respectively.
+
+![Performance on CPUs](/img/cpu.png?raw=true)
+
+Performance on CUDA-enabled GPUs.
+
+![Performance on CUDA-enabled GPUs](/img/cuda.png?raw=true)
+
+Performance on Xeon Phi series (KNC and KNL).
+
+![Performance on Intel Xeon Phis](/img/mic.png?raw=true)
+
+Full system tests.
+![Performance on the full heterogeneous systems](/img/full.png?raw=true)
+
+## Known Issues
 
 Titles cannot be displayed properly on Ubuntu 16.04, but works well on Centos.
